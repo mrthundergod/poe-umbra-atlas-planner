@@ -14,6 +14,8 @@
     <span id="hits"></span>
   </div>
   <div class="zoom">
+    <button id="undo" class="hist" title="Undo (Ctrl+Z)" disabled>&#8630; Undo</button>
+    <button id="redo" class="hist" title="Redo (Ctrl+Shift+Z or Ctrl+Y)" disabled>Redo &#8631;</button>
     <button id="out" title="Zoom out">&minus;</button>
     <span id="pct"></span>
     <button id="in" title="Zoom in">+</button>
@@ -36,6 +38,7 @@
     </span>
     <input id="file" type="file" accept=".json,application/json" hidden>
   </div>
+  <label class="nolimit"><input id="noLimit" type="checkbox"> Allow more than 150 points</label>
   <div id="pngMenu" hidden>
     <b>Download tree image</b>
     <button data-size="4096">4K <small>4096 px, quick</small></button>
@@ -81,6 +84,8 @@
           <li>Nodes with <b>several options</b> open a menu so you can choose one. An orange ring means a choice is still missing.</li>
           <li><b>Drag</b> to move around, <b>scroll</b> to zoom. <b>Fit</b> (or <kbd>0</kbd>) shows the whole tree, <kbd>B</kbd> toggles the background.</li>
           <li><b>Gateways</b> are linked by a dashed line: allocating one lets you continue from its partner on the other side of the tree.</li>
+          <li><b>Undo / Redo</b> with the header buttons or <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> (or <kbd>Ctrl</kbd>+<kbd>Y</kbd>).</li>
+          <li><b>Click a cluster's centre</b> (e.g. Ultimatum) to highlight every cluster of that mechanic.</li>
           <li><b>Search</b> (<kbd>/</kbd>) highlights nodes by name or effect. <kbd>Enter</kbd> jumps to the next match.</li>
         </ul>
       </section>
@@ -106,6 +111,10 @@
     <label class="opt"><input id="wHide" type="checkbox"> Don't show this when the page opens</label>
     <div class="wcredit">Tree viewer and data based on the <a href="https://hypostasis.faith/atlas/data.html" target="_blank" rel="noopener">Atlas Tree by hypostasis.faith</a>. Path planner, saving and image export added on top.</div>
   </div>
+</div>
+<div id="mapnotes">
+  <div id="limitNote" hidden></div>
+  <div id="mechNote" hidden></div>
 </div>
 <div id="credit">Based on the <a href="https://hypostasis.faith/atlas/data.html" target="_blank" rel="noopener">Atlas Tree viewer by hypostasis.faith</a></div>
 <div id="tip"></div>

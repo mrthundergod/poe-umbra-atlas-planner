@@ -6,6 +6,11 @@ const header = document.querySelector('header');
 const panel = document.getElementById('panel');
 const MIN_ZOOM = 0.02, MAX_ZOOM = 1.5;
 const MAX_PICK = 150; // the export still says 138; 150 is this season's limit
+// "no limit" mode: allow more than MAX_PICK points (remembered in this browser)
+let noLimit = false;
+try { noLimit = localStorage.getItem('atlas-nolimit') === 'on'; } catch (e) {}
+const limit = () => noLimit ? Infinity : MAX_PICK;
+const pointCap = () => noLimit ? 999 : MAX_PICK; // highest point budget the planner accepts
 let TOP = 36;
 
 const sheets = T.sheets.map(src => { const im = new Image(); im.onload = draw; im.src = (window.SPRITES && window.SPRITES[src]) || src; return im; });
@@ -238,7 +243,7 @@ function unpick(n) {
 function allocate(n) {
   const path = pathTo(n);
   if (!path) return false;
-  if (picked.size + path.length > MAX_PICK) { flashFull(path.length); return false; }
+  if (picked.size + path.length > limit()) { flashFull(path.length); return false; }
   for (const id of path) picked.set(id, byId.get(id));
   return true;
 }
@@ -331,6 +336,7 @@ function writeHash() {
 const selectionHooks = []; // called after every change to the selection (planner.js)
 function selectionChanged() {
   for (const f of selectionHooks) f();
+  recordHistory();
   document.getElementById('notice').hidden = true; // a new tree replaces the link that failed
   writeHash();
   updatePanel();
@@ -370,7 +376,9 @@ function updatePanel() {
   const n = picked.size;
   const c = document.getElementById('count');
   c.textContent = `${n} / ${MAX_PICK} selected`;
-  c.classList.toggle('full', n >= MAX_PICK);
+  c.classList.toggle('full', !noLimit && n >= MAX_PICK);
+  c.classList.toggle('over', n > MAX_PICK);
+  updateLimitNote();
   document.getElementById('badge').textContent = n;
   document.getElementById('empty').style.display = n ? 'none' : '';
 
@@ -478,7 +486,7 @@ document.getElementById('toggle').onclick = () => {
 function load(items) {
   for (const [id, c] of items) {
     const n = byId.get(id);
-    if (!n || !selectable(n) || picked.size >= MAX_PICK) continue;
+    if (!n || !selectable(n) || picked.size >= limit()) continue;
     picked.set(n.id, n);
     if (n.v && n.v[c]) choice.set(n.id, c);
   }
@@ -571,10 +579,12 @@ function showTip(n, sx, sy) {
   }
   for (const s of n.r) html += '<div class="rem">' + esc(s) + '</div>';
   if (n.f.length) html += '<div class="fl">' + n.f.map(esc).join('<br>') + '</div>';
-  if (n.v && picked.has(n.id)) {
+  if (n.k === 'mastery') {
+    html += '<div class="hint">' + (mechHL && mechHL.name === n.n ? 'Click to clear the highlight' : `Click to highlight every ${esc(n.n)} cluster`) + '</div>';
+  } else if (n.v && picked.has(n.id)) {
     html += '<div class="hint">' + (choice.has(n.id) ? 'Click to change the choice or remove' : 'Click to choose one') + '</div>';
   } else if (preview) {
-    const k = (preview.add || preview.remove).size, left = MAX_PICK - picked.size;
+    const k = (preview.add || preview.remove).size, left = limit() - picked.size;
     const pts = k + (k === 1 ? ' point' : ' points');
     html += '<div class="hint">' + (preview.remove
       ? (k === 1 ? 'Click to remove' : `Click to remove ${k} nodes (this one and those linked through it)`)
@@ -630,7 +640,8 @@ canvas.addEventListener('pointerup', e => {
   canvas.classList.remove('drag');
   if (!click) return;
   const n = pick(e.clientX, e.clientY);
-  if (n && n.v) openMenu(n, e.clientX, e.clientY);
+  if (n && n.k === 'mastery') highlightMechanic(n.n);
+  else if (n && n.v) openMenu(n, e.clientX, e.clientY);
   else if (n) {
     toggle(n);
     if (e.pointerType === 'mouse') showTip(n, e.clientX, e.clientY);
@@ -682,7 +693,9 @@ function exportBoxes() {
       }))
     : [{ heading: 'None', lines: [{ text: 'No multiple-choice notables are allocated.', color: EXPORT_UI.dim }] }];
   return {
-    left: { title: 'Plan requirements', sub: `${picked.size} / ${MAX_PICK} points allocated`, sections: left },
+    left: { title: 'Plan requirements', sub: `${picked.size} / ${MAX_PICK} points allocated`, sections: picked.size > MAX_PICK
+      ? [{ heading: 'Over the point limit', lines: [{ text: `This tree uses ${picked.size} points, ${picked.size - MAX_PICK} more than the ${MAX_PICK} the game allows.`, color: EXPORT_UI.warn }] }, ...left]
+      : left },
     right: { title: 'Multiple-choice notables', sub: `${choiceNodes.length} allocated`, sections: right },
   };
 }
@@ -797,3 +810,114 @@ function exportPNG(size) {
     }
   };
 })();
+
+// ---------- undo / redo ----------
+var hist = { list: [], index: -1, restoring: false }; // var: may be touched before this line runs
+const snap = () => ({ ids: [...picked.keys()], choice: [...choice] });
+const sameSnap = (a, b) => a.ids.length === b.ids.length && a.ids.every((id, i) => id === b.ids[i]) &&
+  a.choice.length === b.choice.length && a.choice.every(([id, c], i) => b.choice[i][0] === id && b.choice[i][1] === c);
+function recordHistory() {
+  if (!hist || hist.restoring) return;
+  const s = snap(), cur = hist.list[hist.index];
+  if (cur && sameSnap(cur, s)) return;
+  hist.list.splice(hist.index + 1);
+  hist.list.push(s);
+  if (hist.list.length > 300) hist.list.shift();
+  hist.index = hist.list.length - 1;
+  updateUndoButtons();
+}
+function restoreSnap(s) {
+  picked.clear();
+  choice.clear();
+  for (const id of s.ids) if (byId.has(id)) picked.set(id, byId.get(id));
+  for (const [id, c] of s.choice) if (picked.has(id)) choice.set(id, c);
+  hist.restoring = true;
+  preview = null;
+  closeMenu();
+  selectionChanged();
+  hist.restoring = false;
+  updateUndoButtons();
+}
+function undo() { if (hist.index > 0) { hist.index--; restoreSnap(hist.list[hist.index]); } }
+function redo() { if (hist.index < hist.list.length - 1) { hist.index++; restoreSnap(hist.list[hist.index]); } }
+function updateUndoButtons() {
+  document.getElementById('undo').disabled = hist.index <= 0;
+  document.getElementById('redo').disabled = hist.index >= hist.list.length - 1;
+}
+document.getElementById('undo').onclick = undo;
+document.getElementById('redo').onclick = redo;
+const dialogOpen = () => ['plan', 'welcome'].some(id => { const d = document.getElementById(id); return d && !d.hidden; });
+addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return; // keep text undo in inputs
+  if (dialogOpen()) return;
+  const k = e.key.toLowerCase();
+  if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+  else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo(); }
+});
+recordHistory(); // the tree the page opened with
+
+// ---------- no point limit ----------
+const noLimitBox = document.getElementById('noLimit');
+noLimitBox.checked = noLimit;
+noLimitBox.onchange = () => {
+  noLimit = noLimitBox.checked;
+  try { localStorage.setItem('atlas-nolimit', noLimit ? 'on' : 'off'); } catch (e) {}
+  updatePanel();
+  draw();
+};
+function updateLimitNote() {
+  const box = document.getElementById('limitNote');
+  if (!box) return;
+  box.hidden = !noLimit && picked.size <= MAX_PICK;
+  const over = picked.size - MAX_PICK;
+  box.classList.toggle('over', over > 0);
+  box.innerHTML = '<b>' + (noLimit ? 'Point limit off' : 'Over the point limit') + '</b>' +
+    (over > 0 ? `This tree uses <b class="n">${picked.size}</b> points, ${over} more than the ${MAX_PICK} the game allows.`
+              : `You can allocate more than ${MAX_PICK} points. The game only allows ${MAX_PICK}.`);
+}
+updateLimitNote();
+
+// ---------- highlight every cluster of a mechanic (click a cluster's centre) ----------
+let mechHL = null; // { name, nodes: Set, rings: [[x, y, r]] }
+function highlightMechanic(name) {
+  if (!name || (mechHL && mechHL.name === name)) { mechHL = null; renderMechNote(); draw(); return; }
+  const nodes = window.atlasMechanic ? window.atlasMechanic(name) : [];
+  const centres = T.nodes.filter(m => m.k === 'mastery' && m.n === name);
+  // one circle per cluster: each node belongs to its nearest centre of this mechanic
+  const rings = centres.map(m => [m.x, m.y, 0]);
+  for (const n of nodes) {
+    let best = 0, bd = Infinity;
+    centres.forEach((m, i) => { const d = Math.hypot(m.x - n.x, m.y - n.y); if (d < bd) { bd = d; best = i; } });
+    if (rings[best]) rings[best][2] = Math.max(rings[best][2], bd);
+  }
+  mechHL = { name, nodes: new Set(nodes.map(n => n.id)), rings: rings.map(([x, y, r]) => [x, y, r + 110]), clusters: centres.length };
+  renderMechNote();
+  draw();
+}
+function renderMechNote() {
+  const box = document.getElementById('mechNote');
+  box.hidden = !mechHL;
+  if (!mechHL) return;
+  box.innerHTML = '';
+  const b = document.createElement('b');
+  b.textContent = mechHL.name;
+  const x = document.createElement('button');
+  x.textContent = '×';
+  x.title = 'Clear the highlight (Esc)';
+  x.onclick = () => highlightMechanic(null);
+  const t = document.createElement('div');
+  t.textContent = `${mechHL.clusters} cluster${mechHL.clusters === 1 ? '' : 's'} highlighted, ${mechHL.nodes.size} nodes. Click a centre again or press Esc to clear.`;
+  box.append(x, b, t);
+}
+overlays.push(() => {
+  if (!mechHL) return;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(64, 224, 192, 0.9)';
+  ctx.lineWidth = 3 / zoom;
+  ctx.setLineDash([14 / zoom, 8 / zoom]);
+  for (const [x, y, r] of mechHL.rings) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke(); }
+  ctx.restore();
+  for (const id of mechHL.nodes) ring(byId.get(id), '#40e0c0', 2, 4);
+});
+addEventListener('keydown', e => { if (e.key === 'Escape' && mechHL && !dialogOpen()) highlightMechanic(null); });

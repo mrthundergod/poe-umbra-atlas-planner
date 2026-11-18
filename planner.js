@@ -355,10 +355,10 @@
     if (state.custom) {
       const lab = el('label', 'custom', 'Points ');
       const inp = el('input');
-      inp.type = 'number'; inp.min = 1; inp.max = MAX_PICK; inp.step = 1; inp.value = state.points;
+      inp.type = 'number'; inp.min = 1; inp.max = pointCap(); inp.step = 1; inp.value = state.points;
       inp.oninput = () => { state.points = Math.floor(+inp.value) || 0; save(); update(); };
       inp.onkeydown = e => { if (e.key === 'Enter' && !next.disabled) next.click(); };
-      lab.append(inp, el('small', null, ` (1–${MAX_PICK})`));
+      lab.append(inp, el('small', null, ` (1–${pointCap()})` + (noLimit ? ' · point limit off' : '')));
       body.append(lab);
       setTimeout(() => { inp.focus(); inp.select(); }, 0);
     }
@@ -462,8 +462,8 @@
       () => true,
       () => true,
       () => true,
-      () => state.points >= 1 && state.points <= MAX_PICK,
-      () => chosen(state.first).length > 0 && state.points >= 1 && state.points <= MAX_PICK,
+      () => state.points >= 1 && state.points <= pointCap(),
+      () => chosen(state.first).length > 0 && state.points >= 1 && state.points <= pointCap(),
     ][step]();
     next.disabled = !ok;
     next.textContent = step === STEPS.length - 1 ? 'Find best path' : (step === 1 && !state.seconds.length) || (step === ELD_STEP && !state.eldritch.length) || (step === KEY_STEP && !keys.size) || (step === THEN_STEP && !state.backups.length) ? 'Skip' : 'Next';
@@ -614,6 +614,10 @@
     ];
   }
   window.atlasPlan = { requirements: () => requirements };
+  // a mechanic's own nodes (notables, cluster nodes, keystones; not generic travel nodes), for the map highlight
+  window.atlasMechanic = name => groups.has(name)
+    ? [...groups.get(name).notables, ...clusterOf(name), ...keystones.filter(k => nearest(k) === name)]
+    : [];
   let goal = null; // { points, ids:Set } – the bigger tree to grow into
 
   function applyPlan(plan) {
