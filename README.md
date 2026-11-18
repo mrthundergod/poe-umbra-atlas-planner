@@ -2,7 +2,7 @@
 
 An Atlas passive tree viewer with a path planner for Path of Exile.
 
-**Live site:** https://mrthundergod.github.io/poe-umbra-atlas-planner/
+**Live site:** https://aravindaj.com/poe-umbra-atlas-planner/
 
 ## Features
 - Click nodes to allocate; the shortest path from the centre fills in automatically.
