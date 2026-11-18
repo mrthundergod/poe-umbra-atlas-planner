@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atlas Tree</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <nav><a href="./" class=on>Atlas Tree</a></nav>
+  <div class="search">
+    <input id="q" type="search" placeholder="Search nodes" autocomplete="off" title="Words in node names or descriptions. Enter: next match, Esc: clear">
+    <span id="hits"></span>
+  </div>
+  <div class="zoom">
+    <button id="out" title="Zoom out">&minus;</button>
+    <span id="pct"></span>
+    <button id="in" title="Zoom in">+</button>
+    <button id="helpBtn" title="How to use this page">Help</button>
+    <button id="planBtn" class="plan" title="Find the best path to the mechanics you want">Plan path</button>
+    <button id="fit" title="Fit tree to screen">Fit</button>
+    <button id="bg" title="Show / hide the background (B)">Background</button>
+    <button id="toggle" title="Show / hide the selection panel">Selected <span id="badge">0</span></button>
+  </div>
+</header>
+<canvas id="c"></canvas>
+<aside id="panel">
+  <div class="ph">
+    <span id="count"></span>
+    <span class="acts">
+      <button id="save" title="Save the selected nodes to a file">Save</button>
+      <button id="open" title="Load a saved tree file">Load</button>
+      <button id="png" title="Download the tree as a high-resolution PNG">PNG</button>
+      <button id="clear">Clear</button>
+    </span>
+    <input id="file" type="file" accept=".json,application/json" hidden>
+  </div>
+  <div id="pngMenu" hidden>
+    <b>Download tree image</b>
+    <button data-size="4096">4K <small>4096 px, quick</small></button>
+    <button data-size="8192">8K <small>8192 px, very high quality</small></button>
+    <div class="note">Your tree in the middle, plan requirements on the left, multiple-choice notables on the right.</div>
+    <div class="msg"></div>
+  </div>
+  <p id="notice" hidden></p>
+  <div id="goalbar" hidden></div>
+  <div id="planres" hidden></div>
+  <p id="empty">Click nodes on the tree to select them (up to <span id="max"></span> points). Their effects add up here. Nodes with several choices ask which one you want.</p>
+  <h3>Effects</h3>
+  <ul id="effects"></ul>
+  <h3>Nodes</h3>
+  <ul id="picked"></ul>
+</aside>
+<div id="plan" hidden>
+  <div class="box" role="dialog" aria-labelledby="planTitle">
+    <div class="ptop">
+      <div><h2 id="planTitle">Plan a path</h2><span id="pStep"></span></div>
+      <button id="pClose" title="Close (Esc)">&times;</button>
+    </div>
+    <div id="pBody"></div>
+    <div id="pStatus"></div>
+    <div class="pfoot">
+      <button id="pBack">Back</button>
+      <button id="pNext">Next</button>
+    </div>
+  </div>
+</div>
+<div id="welcome" hidden>
+  <div class="box" role="dialog" aria-labelledby="wTitle">
+    <div class="ptop">
+      <h2 id="wTitle">How to use the Atlas Tree</h2>
+      <button id="wClose" title="Close (Esc)">&times;</button>
+    </div>
+    <div class="wbody">
+      <section>
+        <h3>Allocate nodes yourself</h3>
+        <ul>
+          <li><b>Click a node</b> to allocate it. The shortest path from the centre is filled in for you (green preview on hover).</li>
+          <li><b>Click an allocated node</b> to remove it, along with anything that only connected through it.</li>
+          <li>Nodes with <b>several options</b> open a menu so you can choose one. An orange ring means a choice is still missing.</li>
+          <li><b>Drag</b> to move around, <b>scroll</b> to zoom. <b>Fit</b> (or <kbd>0</kbd>) shows the whole tree, <kbd>B</kbd> toggles the background.</li>
+          <li><b>Gateways</b> are linked by a dashed line: allocating one lets you continue from its partner on the other side of the tree.</li>
+          <li><b>Search</b> (<kbd>/</kbd>) highlights nodes by name or effect. <kbd>Enter</kbd> jumps to the next match.</li>
+        </ul>
+      </section>
+      <section>
+        <h3>Let the planner do it</h3>
+        <ul>
+          <li><b>Plan path</b> asks for your main mechanic, up to two secondary ones, Eldritch influence, keystones, what to travel through (pack size, threads, …) and how many points you have.</li>
+          <li>It finds the best route from the centre and fills the tree. Notables it couldn't reach get <b style="color:var(--bad)">red rings</b>.</li>
+        </ul>
+      </section>
+      <section>
+        <h3>Keep your tree</h3>
+        <ul>
+          <li>The <b>Selected</b> panel adds up all effects. <b>Save</b> downloads your tree as a file, <b>Load</b> opens one again.</li>
+          <li>The page address always holds your current tree, so you can copy it as a link.</li>
+        </ul>
+      </section>
+    </div>
+    <div class="wchoice">
+      <button id="wScratch" class="card"><b>Start from scratch</b><span>Click nodes on the tree yourself.</span></button>
+      <button id="wPlan" class="card on"><b>Plan a build</b><span>Answer a few questions and get the best path.</span></button>
+    </div>
+    <label class="opt"><input id="wHide" type="checkbox"> Don't show this when the page opens</label>
+    <div class="wcredit">Tree viewer and data based on the <a href="https://hypostasis.faith/atlas/data.html" target="_blank" rel="noopener">Atlas Tree by hypostasis.faith</a>. Path planner, saving and image export added on top.</div>
+  </div>
+</div>
+<div id="credit">Based on the <a href="https://hypostasis.faith/atlas/data.html" target="_blank" rel="noopener">Atlas Tree viewer by hypostasis.faith</a></div>
+<div id="tip"></div>
+<div id="menu"></div>
+<script src="trees/data.js"></script>
+<script>
+  // opened from disk: use embedded images so the canvas can still be exported as PNG
+  if (location.protocol === 'file:') document.write('<script src="trees/sprites.js"><\/script>');
+</script>
+<script src="share.js"></script>
+<script src="viewer.js"></script>
+<script src="solver.js"></script>
+<script src="planner.js"></script>
+<script src="welcome.js"></script>
+</body>
+</html>
