@@ -530,6 +530,7 @@ function loadOld(code) {
 const longLink = /#s=([\d,:]+)/.exec(location.hash);
 const shortLink = /#t=([\w-]+)/.exec(location.hash);
 
+if (longLink || shortLink) track('shared-link-open', 'Opened a shared tree link');
 if (longLink) {
   load(longLink[1].split(',').map(item => item.split(':').map(Number)));
 } else if (shortLink) {
@@ -803,6 +804,7 @@ function exportPNG(size) {
     try {
       const r = await exportPNG(+b.dataset.size);
       msg.textContent = `Saved ${r.width}×${r.height} px (${(r.bytes / 1048576).toFixed(1)} MB)`;
+      track('png-export', `PNG export ${r.width}px`);
     } catch (err) {
       msg.textContent = "Couldn't create the image: " + (/tainted/i.test(err.message)
         ? 'the browser blocked it because the tree images were loaded from another site. Reload the page and try again.'

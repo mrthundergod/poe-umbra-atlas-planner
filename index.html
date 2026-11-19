@@ -119,6 +119,19 @@
 <div id="credit">Based on the <a href="https://hypostasis.faith/atlas/data.html" target="_blank" rel="noopener">Atlas Tree viewer by hypostasis.faith</a></div>
 <div id="tip"></div>
 <div id="menu"></div>
+<script>
+// GoatCounter events; waits for count.js, does nothing if it's blocked or on localhost
+window.track = (path, title) => {
+  const go = () => window.goatcounter && window.goatcounter.count &&
+    window.goatcounter.count({ path, title: title || path, event: true });
+  window.goatcounter && window.goatcounter.count ? go() : addEventListener('load', go, { once: true });
+};
+const EVENTS = { save: 'save-file', open: 'load-file', helpBtn: 'help', wScratch: 'welcome-scratch', wPlan: 'welcome-plan', planBtn: 'plan-open' };
+document.addEventListener('click', e => {
+  const b = e.target.closest('button[id]');
+  if (b && EVENTS[b.id]) track(EVENTS[b.id]);
+}, true);
+</script>
 <script src="trees/data.js"></script>
 <script>
   // opened from disk: use embedded images so the canvas can still be exported as PNG

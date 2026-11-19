@@ -523,6 +523,8 @@
     for (const n of keyNodes) weights.set(n.id, 1e6);
     if (picked.size && !confirm(`Replace your current ${picked.size}-point selection with a planned one?`)) return;
 
+    track('plan-run', `Plan: ${state.first || 'none'}, ${budget} pts`);
+    for (const m of [state.first, ...state.seconds]) if (m) track('mechanic/' + m, 'Mechanic: ' + m);
     running = true;
     next.disabled = back.disabled = true;
     const status = $('pStatus');
